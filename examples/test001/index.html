@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试001</title>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="../../node_modules/@vue/reactivity/dist/reactivity.global.js"></script>
+  <script>
+    console.log(VueReactivity);
+    const { reactive, readonly } = VueReactivity;
+    const data = readonly({
+      name: "apem",
+      skill: {
+        a: 1,
+        obj: {
+          b: 2
+        }
+      }
+    })
+
+    console.log(data);
+    console.log(data.name);
+    data.name = "oop";
+    // console.log(data.skill);
+    // console.log(data.skill.obj);
+
+  </script>
+</body>
+</html>
