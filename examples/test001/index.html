@@ -11,24 +11,82 @@
 
   <script src="../../node_modules/@vue/reactivity/dist/reactivity.global.js"></script>
   <script>
-    console.log(VueReactivity);
-    const { reactive, readonly } = VueReactivity;
-    const data = readonly({
-      name: "apem",
-      skill: {
-        a: 1,
-        obj: {
-          b: 2
+    const { reactive, shallowReactive, readonly, shallowReadonly } = VueReactivity;
+      const state = reactive({
+        name: "apem",
+        map: {
+          skill: ['js', 'ts'],
+          git: {
+            url: "xxxxx.xxx.xx",
+            up: {
+              count: 10
+            }
+          }
         }
-      }
-    })
+      })
+      console.log("reactive state:", state);
+      console.log("reactive state.map:", state.map);
+      console.log("reactive state.name:", state.name);
+      console.log("====================================");
 
-    console.log(data);
-    console.log(data.name);
-    data.name = "oop";
-    // console.log(data.skill);
-    // console.log(data.skill.obj);
+      const state2 = shallowReactive({
+        name: "apem",
+        map: {
+          skill: ['js', 'ts'],
+          git: {
+            url: "xxxxx.xxx.xx",
+            up: {
+              count: 10
+            }
+          }
+        }
+      })
+      console.log("shallowReactive state2:", state2);
+      console.log("shallowReactive state2.map:", state2.map);
+      console.log("shallowReactive state2.name:", state2.name);
+      console.log("shallowReactive state2.map.git.up:", state2.map.git.up);
+      console.log("====================================");
 
+      const state3 = readonly({
+        name: "apem",
+        map: {
+          skill: ['js', 'ts'],
+          git: {
+            url: "xxxxx.xxx.xx",
+            up: {
+              count: 10
+            }
+          }
+        }
+      });
+      console.log("readonly state3:", state3);
+      setTimeout(() => {
+        state3.name = "pick";
+        state3.map.skill = ["mysql"];
+        console.log("readonly state3:", state3);
+        console.log("====================================");
+      }, 1000);
+
+      const state4 = shallowReadonly({
+        name: "apem",
+        map: {
+          skill: ['js', 'ts'],
+          git: {
+            url: "xxxxx.xxx.xx",
+            up: {
+              count: 10
+            }
+          }
+        }
+      });
+      console.log("shallowReadonly state4:", state4);
+      console.log("shallowReadonly state4.map.skill:", state4.map.skill);
+      setTimeout(() => {
+        state4.name = "pick";
+        state4.map.skill = ["mysql"];
+        console.log("shallowReadonly 修改state4.map.skill:", state4.map.skill);
+        console.log("====================================");
+      }, 1000);
   </script>
 </body>
 </html>
