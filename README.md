@@ -1,6 +1,16 @@
 # 分模块
 - reactivity 响应式模块
-- shared     
+	+ [reactive, shallowReactive, readonly, shallowReadonly] <-> new Proxy
+		- isShallow - 作用于表层(最上层的对象)
+			+ true: 表层响应式包装对象
+			+ false: 深度递归只读或响应式包装各层对象变proxy
+		- isReadonly - 仅读属性
+			+ true: set方法不会进行赋值操作， get方法不会收集依赖
+	+ effect: 副作用(响应式数据取值时的依赖收集), watchEffect 的基础
+
+- shared 公共函数模块
+
+
 
 ## 主要依赖
 ```bash

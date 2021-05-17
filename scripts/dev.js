@@ -18,7 +18,7 @@ async function build(packageName) {
   // rollup -c --environment TARGET:子项目目录名
   // { stdout: "inherit" } 子进程打包信息共享给父进程的配置
   // 传值给 rollup 配置信息
-  await execa("rollup", ["-c", "--environment", `TARGET:${packageName}`], { stdout: "inherit" })
+  await execa("rollup", ["-cw", "--environment", `TARGET:${packageName}`], { stdout: "inherit" })
 }
 
 build(packageName);

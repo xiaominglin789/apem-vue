@@ -1,5 +1,7 @@
 import { isObject } from "@vue/shared";
 import { readonly, reactive } from "./reactive";
+import { TrackOpsEnum } from "./enum";
+import { track } from "./effect";
 
 /** 响应式对象-get */
 const get = createGetter(false, false);
@@ -27,6 +29,10 @@ function createGetter(isReadonly=false, isShollaw=false) {
     if (!isReadonly) {
       // 只读的对象不做依赖收集
       // 响应式对象-才作依赖收集
+      // 取值时, 去 执行 tract 收集 effect
+      // v3 effect =取代了=>  v2 watcher
+      console.log("执行effect时会取值， 需要收集effect: ", key);
+      track(target, TrackOpsEnum.GET, key);
     }
 
     if (isShollaw) {
