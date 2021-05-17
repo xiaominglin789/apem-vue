@@ -3,3 +3,11 @@ export enum TrackOpsEnum {
   /** 取值 */
   GET,
 }
+
+/** 触发标记枚举 */
+export enum TriggerOpsEnum {
+  /** 添加 */
+  ADD,
+  /** 修改 */
+  SET
+}

@@ -1,7 +1,85 @@
-import { isObject } from "@vue/shared";
+import { compareValue, hasOwnKey, isArray, isInteger, isObject } from "@vue/shared";
 import { readonly, reactive } from "./reactive";
-import { TrackOpsEnum } from "./enum";
-import { track } from "./effect";
+import { TrackOpsEnum, TriggerOpsEnum } from "./enum";
+import { track, trigger } from "./effect";
+
+/**
+ * getter读取
+ * @param isReadonly 是否为仅读, true: readonly仅读, false: 响应式proxy
+ * @param isShollaw 是否为仅作用于第一层, true: 仅作用于第一层， false: 全部嵌套属性都仅读或响应式
+ * @returns 
+ */
+function createGetter(isReadonly=false, isShollaw=false) {
+  return function get(target: any, key: string, receiver: any) {
+    const result = Reflect.get(target, key, receiver);
+
+    // console.log('get key = ', key);
+
+    if (!isReadonly) {
+      // 只读的对象不做依赖收集
+      // 响应式对象-才作依赖收集
+      // 取值时, 去 执行 tract 收集 effect
+      // v3 effect =取代了=>  v2 watcher
+      // console.log("执行effect时会取值， 需要收集effect: ", key);
+
+      track(target, TrackOpsEnum.GET, key);
+    }
+
+    if (isShollaw) {
+      // 只有第一层是响应式属性
+      return result;
+    } 
+    
+    if (isObject(result)) {
+      // 当取值时才进行代理
+      // 判断对象类型，只读属性，递归包装
+      return isReadonly ? readonly(result) : reactive(result);
+    }
+    
+    return result;
+  }
+}
+
+/**
+ * setter写入(只有响应式数据才能修改)
+ * @param isShollaw 是否为仅作用于第一层, true: 仅作用于第一层， false: 全部嵌套属性都响应式
+ * 注意点:
+ * 1.target push / pop 等修改了数组长度的操作 都会触发2次set. 
+ *    因为第一次是下标索引值的改变,
+ *    第二次是length属性的改变, 但是 。
+ * 2.如果是外部直接修改数组的length属性, 执行 trigger
+ */
+function createSetter(isShollaw=false) {
+  return function set(target: any, key: string, newValue: any, receiver: any) {
+    const oldValue = target[key];
+
+    // 是不是数组, 判断key(下标)是不是比原数组长度小:  小-> set 修改操作, 大 添加新元素的操作
+    //   不是数值型数组, 则为 对象类型。判断 key是不是对象商的属性。是 -> 修改操作， 否 添加新属性的操作。
+    let hasKey = (isArray(target) && isInteger(key)) ? 
+                  (Number(key) < target.length) : hasOwnKey(target, key);
+    
+    // 反射
+    // const result = Reflect.set(target, key, newValue, receiver);
+    
+    console.log("oldValue = ", oldValue, " newValue = ", newValue);
+    
+    if (!hasKey) {
+      // 添加操作
+      // 通知effect trigger操作
+      trigger(target, TriggerOpsEnum.ADD, key, newValue);
+      
+    } else if (!compareValue(oldValue, newValue)) {
+      // 值不同,才去改。值一样,不修改
+      // 通知effect trigger操作
+      trigger(target, TriggerOpsEnum.SET, key, newValue, oldValue);
+    }
+
+    const result = Reflect.set(target, key, newValue, receiver);
+    // 返回修改的结果 true/false
+    return result;
+  }
+}
+
 
 /** 响应式对象-get */
 const get = createGetter(false, false);
@@ -16,58 +94,6 @@ const set = createSetter(false);
 /** 仅第一层响应式对象-set */
 const shollawReactiveSetter = createSetter(true);
 
-/**
- * getter读取
- * @param isReadonly 是否为仅读, true: readonly仅读, false: 响应式proxy
- * @param isShollaw 是否为仅作用于第一层, true: 仅作用于第一层， false: 全部嵌套属性都仅读或响应式
- * @returns 
- */
-function createGetter(isReadonly=false, isShollaw=false) {
-  return function get(target: object, key: string, recevier: object) {
-    const result = Reflect.get(target, key, recevier);
-
-    if (!isReadonly) {
-      // 只读的对象不做依赖收集
-      // 响应式对象-才作依赖收集
-      // 取值时, 去 执行 tract 收集 effect
-      // v3 effect =取代了=>  v2 watcher
-      console.log("执行effect时会取值， 需要收集effect: ", key);
-      track(target, TrackOpsEnum.GET, key);
-    }
-
-    if (isShollaw) {
-      // 只有第一层是响应式属性
-      return result;
-    } 
-    
-    if (isObject(result)) {
-      // 当取值时才进行代理
-      // 判断对象类型，只读属性，递归包装
-      return isReadonly ? readonly(result) : reactive(result);
-    }
-
-    return result;
-  }
-}
-
-/**
- * setter写入(只有响应式数据才能修改)
- * @param isShollaw 是否为仅作用于第一层, true: 仅作用于第一层， false: 全部嵌套属性都响应式
- */
-function createSetter(isShollaw=false) {
-  return function set(target: object, key: string, newValue: any, recevier: object) {
-    const result = Reflect.set(target, key, newValue, recevier);
-    
-    if (isShollaw) {
-      // true
-    } else {
-      // false
-    }
-
-
-    return result;
-  }
-}
 
 /** reactive包装-get/set处理 */
 const handleReactive = {
@@ -84,7 +110,7 @@ const handleShollawReactive = {
 /** readonly包装-get/set处理 */
 const handleReadonly = {
   get: readonlyGetter,
-  set: (target: object, key: string) => {
+  set: (target: any, key: string) => {
     console.warn(target, " 所有属性都是只读, 无法修改");
     return false;
   }
@@ -93,7 +119,7 @@ const handleReadonly = {
 /** shallowReadonly包装-get/set处理 */
 const handleShollawReadonly = {
   get: shollawReadonlyGetter,
-  set: (target: object, key: string) => {
+  set: (target: any, key: string) => {
     console.warn(target, " 的属性:", key, " 属性是只读的, 无法修改");
     return false;
   }

@@ -16,21 +16,22 @@
     let state = reactive({
       name: "apem",
       age: 12,
-      other: "abc"
+      other: "abc",
+      arr: [1,2,3]
     });
 
     effect(() => {
-      app.innerHTML = state.name + " 年龄: " + state.age;
-    });
-    effect(() => {
-      app.innerHTML = state.name + " 年龄: " + state.age;
+      app.innerHTML = state.arr[1] + state.arr.length;
+      console.log("123321123");
+      console.log(state.arr);
     });
 
     setTimeout(() => {
-      state.other = "cba";
-      state.name = "小明";
-      console.log(state);
-    }, 2000);
+      // state.arr.push(98);
+      // state.arr[2] = 9999;
+      state.arr.length = 1;
+      // console.log(state);
+    }, 3000);
 
   </script>
 </body>

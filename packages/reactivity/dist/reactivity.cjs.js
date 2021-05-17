@@ -4,16 +4,49 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 /** 共享模块-通用方法集合 */
 /**
- * 判断data是否为对象类型
- * @param data
+ * 判断 是否为对象类型
+ * @param target
  * @returns true: 是对象类型,  false: 非对象类型
  */
-function isObject(data) {
-    let flag = false;
-    if (Object.prototype.toString.call(data) === "[object Object]") {
-        flag = true;
+function isObject(target) {
+    return typeof target == "object" && target !== null;
+}
+/**
+ * 判断 是不是数组类型
+ * @param target
+ * @returns true: 数组类型,  false: 非数组类型
+ */
+function isArray(target) {
+    return Array.isArray(target);
+}
+/**
+ * 判断 是不是整形数字类型
+ * @param target
+ * @returns true: 整形数字类型,  false: 非 整形数字类型
+ */
+function isInteger(target) {
+    return parseInt(target) + "" === target;
+}
+/**
+ * target 是否有 key 这个属性
+ * @param target
+ * @param key key键的属性
+ * @returns
+ */
+function hasOwnKey(target, key) {
+    return Object.prototype.hasOwnProperty.call(target, key);
+}
+/**
+ * 2值比较是否相等
+ * @param valA
+ * @param valB
+ * @returns true: 值一样的， false: 值不一样
+ */
+function compareValue(valA, valB) {
+    if (!valA || !valB) {
+        return false;
     }
-    return flag;
+    return valB === valA;
 }
 
 /** 依赖收集的操作标识枚举 */
@@ -22,6 +55,14 @@ var TrackOpsEnum;
     /** 取值 */
     TrackOpsEnum[TrackOpsEnum["GET"] = 0] = "GET";
 })(TrackOpsEnum || (TrackOpsEnum = {}));
+/** 触发标记枚举 */
+var TriggerOpsEnum;
+(function (TriggerOpsEnum) {
+    /** 添加 */
+    TriggerOpsEnum[TriggerOpsEnum["ADD"] = 0] = "ADD";
+    /** 修改 */
+    TriggerOpsEnum[TriggerOpsEnum["SET"] = 1] = "SET";
+})(TriggerOpsEnum || (TriggerOpsEnum = {}));
 
 /** effect序号标识 */
 let effectID = 0;
@@ -59,7 +100,7 @@ function createReactiveEffect(fn, options = { lazy: false }) {
         // 函数执行, 会取值, 会执行reactive的get方法作依赖收集
         if (!effectStack.includes(effect)) {
             try {
-                console.log("准备执行effect内的函数");
+                // console.log("准备执行effect内的函数");
                 effectStack.push(effect);
                 activeEffect = effect;
                 return fn();
@@ -82,7 +123,7 @@ function createReactiveEffect(fn, options = { lazy: false }) {
     return effect;
 }
 /**
- * 依赖收集函数
+ * 收集器 依赖收集函数
  * 让 某个对象的属性,收集其当前对应的effect函数。
  * @param target 目标对象
  * @param trackOpType 操作标识
@@ -108,21 +149,57 @@ function track(target, trackOpType, key) {
     if (!dep.has(activeEffect)) {
         dep.add(activeEffect);
     }
-    console.log(targetEffectMap);
+}
+/**
+ * 触发器 effect->通知->视图更新
+ * @param target 目标对象
+ * @param TriggerOpsEnum 触发的类型:SET / ADD
+ * @param key 哪个键
+ * @param newValue 新值
+ * @param oldValue 旧值
+ */
+function trigger(target, triggerOpsEnum, key, newValue, oldValue) {
+    console.error(target, triggerOpsEnum, key, newValue, oldValue);
+    // 取出-当前目标对应的effects
+    const depsMap = targetEffectMap.get(target);
+    if (!depsMap) {
+        // 该对象无依赖, 后续不操作
+        return;
+    }
+    // 缓存要操作的effects, 最终一起执行。
+    const effects = new Set();
+    const add = (effs) => {
+        if (effs) {
+            effs.forEach(eff => effects.add(eff));
+        }
+    };
+    // 当前依赖
+    console.log(depsMap);
+    // 查看是否修改的是数组的长度, 特殊处理:
+    if (key === "length" && isArray(target)) {
+        console.log("aaaaaaaaaaa");
+        // 数组
+        // 如果对应的长度, 有依赖收集 则需要更新
+        depsMap.forEach((dep, key) => {
+            console.log("key ", key, " newValue ", newValue);
+            if (key === "length" || key > newValue) {
+                add(dep);
+                console.log(dep);
+            }
+        });
+    }
+    else {
+        // 非数组
+        console.log("bbbbbbbbbb");
+    }
+    console.log("effects ", effects);
+    // 执行effects内的每一个函数
+    effects.forEach((ef) => {
+        console.log(ef);
+        ef();
+    });
 }
 
-/** 响应式对象-get */
-const get = createGetter(false, false);
-/** 仅第一层响应式对象-get */
-const shollawReactiveGetter = createGetter(false, true);
-/** 全部属性仅读对象-get */
-const readonlyGetter = createGetter(true, false);
-/** 仅第一层只读对象-get */
-const shollawReadonlyGetter = createGetter(true, true);
-/** 响应式对象-set */
-const set = createSetter(false);
-/** 仅第一层响应式对象-set */
-const shollawReactiveSetter = createSetter(true);
 /**
  * getter读取
  * @param isReadonly 是否为仅读, true: readonly仅读, false: 响应式proxy
@@ -130,14 +207,15 @@ const shollawReactiveSetter = createSetter(true);
  * @returns
  */
 function createGetter(isReadonly = false, isShollaw = false) {
-    return function get(target, key, recevier) {
-        const result = Reflect.get(target, key, recevier);
+    return function get(target, key, receiver) {
+        const result = Reflect.get(target, key, receiver);
+        // console.log('get key = ', key);
         if (!isReadonly) {
             // 只读的对象不做依赖收集
             // 响应式对象-才作依赖收集
             // 取值时, 去 执行 tract 收集 effect
             // v3 effect =取代了=>  v2 watcher
-            console.log("执行effect时会取值， 需要收集effect: ", key);
+            // console.log("执行effect时会取值， 需要收集effect: ", key);
             track(target, TrackOpsEnum.GET, key);
         }
         if (isShollaw) {
@@ -155,13 +233,49 @@ function createGetter(isReadonly = false, isShollaw = false) {
 /**
  * setter写入(只有响应式数据才能修改)
  * @param isShollaw 是否为仅作用于第一层, true: 仅作用于第一层， false: 全部嵌套属性都响应式
+ * 注意点:
+ * 1.target push / pop 等修改了数组长度的操作 都会触发2次set.
+ *    因为第一次是下标索引值的改变,
+ *    第二次是length属性的改变, 但是 。
+ * 2.如果是外部直接修改数组的length属性, 执行 trigger
  */
 function createSetter(isShollaw = false) {
-    return function set(target, key, newValue, recevier) {
-        const result = Reflect.set(target, key, newValue, recevier);
+    return function set(target, key, newValue, receiver) {
+        const oldValue = target[key];
+        // 是不是数组, 判断key(下标)是不是比原数组长度小:  小-> set 修改操作, 大 添加新元素的操作
+        //   不是数值型数组, 则为 对象类型。判断 key是不是对象商的属性。是 -> 修改操作， 否 添加新属性的操作。
+        let hasKey = (isArray(target) && isInteger(key)) ?
+            (Number(key) < target.length) : hasOwnKey(target, key);
+        // 反射
+        // const result = Reflect.set(target, key, newValue, receiver);
+        console.log("oldValue = ", oldValue, " newValue = ", newValue);
+        if (!hasKey) {
+            // 添加操作
+            // 通知effect trigger操作
+            trigger(target, TriggerOpsEnum.ADD, key, newValue);
+        }
+        else if (!compareValue(oldValue, newValue)) {
+            // 值不同,才去改。值一样,不修改
+            // 通知effect trigger操作
+            trigger(target, TriggerOpsEnum.SET, key, newValue, oldValue);
+        }
+        const result = Reflect.set(target, key, newValue, receiver);
+        // 返回修改的结果 true/false
         return result;
     };
 }
+/** 响应式对象-get */
+const get = createGetter(false, false);
+/** 仅第一层响应式对象-get */
+const shollawReactiveGetter = createGetter(false, true);
+/** 全部属性仅读对象-get */
+const readonlyGetter = createGetter(true, false);
+/** 仅第一层只读对象-get */
+const shollawReadonlyGetter = createGetter(true, true);
+/** 响应式对象-set */
+const set = createSetter(false);
+/** 仅第一层响应式对象-set */
+const shollawReactiveSetter = createSetter(true);
 /** reactive包装-get/set处理 */
 const handleReactive = {
     get,
@@ -214,7 +328,7 @@ function createReactiveObject(target, isReadonly, handle) {
         // 有缓存, 返回缓存
         return proxyMap.get(target);
     }
-    // 无缓存, 先存缓存
+    // 无缓存, 新建, 先存缓存
     const targetProxy = new Proxy(target, handle);
     proxyMap.set(target, targetProxy);
     return targetProxy;
