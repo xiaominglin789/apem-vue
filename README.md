@@ -1,4 +1,7 @@
-# 分模块
+# 手写vue3 核心模块
+
+
+## 响应式模块
 - reactivity 响应式模块
 	+ [reactive, shallowReactive, readonly, shallowReadonly] <-> new Proxy
 		- isShallow - 作用于表层(最上层的对象)
@@ -7,6 +10,8 @@
 		- isReadonly - 仅读属性
 			+ true: set方法不会进行赋值操作， get方法不会收集依赖
 	+ effect: 副作用(响应式数据取值时的依赖收集), watchEffect 的基础
+		- 1.effect函数中的所有属性 都会收集effect -> track
+		- 2.当这些属性触发时,会重新执行effect函数 -> trigger
 
 - shared 公共函数模块
 
