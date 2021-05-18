@@ -17,7 +17,7 @@ const readonlyProxyMap = new WeakMap();
  * @param isReadonly 是否仅读
  * @param handle get/set-处理配置项
  */
-function createReactiveObject(target: any, isReadonly: boolean, handle: ProxyHandler<any>) {
+function createReactiveObject(target: any, isReadonly: boolean, handle: ProxyHandler<object>) {
   /**
    * 1.数据源是不是对象类型, 非对象的数据源直接返回
    * 2.数据源是否已被代理过了,有代理则直接返回代理的数据
@@ -36,7 +36,7 @@ function createReactiveObject(target: any, isReadonly: boolean, handle: ProxyHan
   }
 
   // 无缓存, 新建, 先存缓存
-  const targetProxy = new Proxy(target, handle);
+  const targetProxy = new Proxy<object>(target, handle);
   proxyMap.set(target, targetProxy);
 
   return targetProxy;

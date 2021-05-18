@@ -1,18 +1,27 @@
 # reactivity主要api：
+
+## 响应式数据包装
 - reactive()
-- effect()
 - shallowReactive()
 - readonly()
 - shallowReadonly()
-- isReactive()
-- isReadonly()
-- isProxy()
-- markRaw()              函数用于让数据不可被代理
-- toRaw()
-- watchEffect()
+
+## effect函数作依赖收集
+- effect()
+
+## 响应式数据还原
 - ref()
-- isRef()
 - toRef()
 - toRefs()
 - unref()
 - computed()
+
+
+## 响应式数据判断
+- isReactive()
+- isReadonly()
+- isProxy()
+- markRaw()
+- isRef()
+- toRaw()
+- watchEffect()

@@ -66,18 +66,10 @@ var VueReactivity = (function (exports) {
   /** effect序号标识 */
   let effectID = 0;
   /** 当前的effect */
-  let activeEffect = null;
+  let activeEffect;
   /** effect存储栈 */
   const effectStack = [];
-  /**
-   * 对象-属性-effects 依赖映射表
-   * 结构:-WeakMap(-Map(-Set))
-   * {
-   *    target: {
-   *      key: Set(effect1, effect2)
-   *    }
-   * }
-   */
+  /** 对象-属性-effects 依赖映射表 */
   const targetEffectMap = new WeakMap();
   /**
    * 副作用
@@ -85,21 +77,21 @@ var VueReactivity = (function (exports) {
    * @param fn 函数
    * @param options 配置对象:key-value
    */
-  function effect(fn, options = { lazy: false }) {
-      const effect = createReactiveEffect(fn, options);
-      if (!options.lazy) {
+  function effect(fn, options) {
+      // 数据变化，重新执行
+      const eff = createReactiveEffect(fn, options);
+      if (!options?.lazy) {
           // 默认先执行一次
-          effect();
+          eff();
       }
-      return effect;
+      return eff;
   }
   /** 创建可响应的efflect函数 - 闭包 */
-  function createReactiveEffect(fn, options = { lazy: false }) {
+  function createReactiveEffect(fn, options) {
       const effect = function reactiveEffect() {
-          // 函数执行, 会取值, 会执行reactive的get方法作依赖收集
+          // 函数执行, 会取值, 会执行 reactive的get 关联-依赖收集
           if (!effectStack.includes(effect)) {
               try {
-                  // console.log("准备执行effect内的函数");
                   effectStack.push(effect);
                   activeEffect = effect;
                   return fn();
@@ -129,22 +121,17 @@ var VueReactivity = (function (exports) {
    * @param key 对象的属性
    */
   function track(target, trackOpType, key) {
-      // console.log("收集到依赖 ", target, " ", key);
-      // console.log(target, key, activeEffect);
-      if (null === activeEffect) {
+      if (activeEffect === undefined) {
           return;
       }
       let depsMap = targetEffectMap.get(target);
       if (!depsMap) {
-          // 空map,初始化taget键
           targetEffectMap.set(target, (depsMap = new Map));
       }
       let dep = depsMap.get(key);
       if (!dep) {
-          // 空vulue-map,初始化set
           depsMap.set(key, (dep = new Set));
       }
-      // set去重effect
       if (!dep.has(activeEffect)) {
           dep.add(activeEffect);
       }
@@ -158,44 +145,47 @@ var VueReactivity = (function (exports) {
    * @param oldValue 旧值
    */
   function trigger(target, triggerOpsEnum, key, newValue, oldValue) {
-      console.error(target, triggerOpsEnum, key, newValue, oldValue);
       // 取出-当前目标对应的effects
       const depsMap = targetEffectMap.get(target);
       if (!depsMap) {
           // 该对象无依赖, 后续不操作
           return;
       }
-      // 缓存要操作的effects, 最终一起执行。
-      const effects = new Set();
-      const add = (effs) => {
+      /** 收集将要操作的effect-事件, 最后才去执行。 */
+      const waitRunEffects = new Set();
+      /** 收集将要操作的effect-事件, 最后才去执行。 */
+      const addToWaitRunEffects = (effs) => {
           if (effs) {
-              effs.forEach(eff => effects.add(eff));
+              effs.forEach((eff) => waitRunEffects.add(eff));
           }
       };
-      // 当前依赖
-      console.log(depsMap);
-      // 查看是否修改的是数组的长度, 特殊处理:
       if (key === "length" && isArray(target)) {
-          console.log("aaaaaaaaaaa");
-          // 数组
-          // 如果对应的长度, 有依赖收集 则需要更新
+          // 查看是否修改的是数组的长度, 特殊处理:
           depsMap.forEach((dep, key) => {
-              console.log("key ", key, " newValue ", newValue);
-              if (key === "length" || key > newValue) {
-                  add(dep);
-                  console.log(dep);
+              // 如果是直接修改的length属性 或者 旧的长度 > 新的长度时,将`length`依赖存入起来
+              // key 来至于 Map内， Symbol(Symbol.toPrimitive) 类型，String包装再和value隐式比较
+              if (String(key) === "length" || String(key) > newValue) {
+                  addToWaitRunEffects(dep);
               }
           });
       }
       else {
-          // 非数组
-          console.log("bbbbbbbbbb");
+          // 普通key对象
+          if (key !== undefined) {
+              addToWaitRunEffects(depsMap.get(key));
+          }
+          // 数组 特殊处理: 是数组 且 添加 的操作，长度改变
+          switch (triggerOpsEnum) {
+              case TriggerOpsEnum.ADD:
+                  if (isArray(target)) {
+                      addToWaitRunEffects(depsMap.get("length"));
+                  }
+                  break;
+          }
       }
-      console.log("effects ", effects);
-      // 执行effects内的每一个函数
-      effects.forEach((ef) => {
-          console.log(ef);
-          ef();
+      // 执行依赖收集的函数
+      waitRunEffects.forEach((eff) => {
+          eff();
       });
   }
 
@@ -207,14 +197,13 @@ var VueReactivity = (function (exports) {
    */
   function createGetter(isReadonly = false, isShollaw = false) {
       return function get(target, key, receiver) {
+          // 从反射中取值
           const result = Reflect.get(target, key, receiver);
-          // console.log('get key = ', key);
           if (!isReadonly) {
               // 只读的对象不做依赖收集
               // 响应式对象-才作依赖收集
               // 取值时, 去 执行 tract 收集 effect
               // v3 effect =取代了=>  v2 watcher
-              // console.log("执行effect时会取值， 需要收集effect: ", key);
               track(target, TrackOpsEnum.GET, key);
           }
           if (isShollaw) {
@@ -244,21 +233,18 @@ var VueReactivity = (function (exports) {
           // 是不是数组, 判断key(下标)是不是比原数组长度小:  小-> set 修改操作, 大 添加新元素的操作
           //   不是数值型数组, 则为 对象类型。判断 key是不是对象商的属性。是 -> 修改操作， 否 添加新属性的操作。
           let hasKey = (isArray(target) && isInteger(key)) ?
-              (Number(key) < target.length) : hasOwnKey(target, key);
-          // 反射
-          // const result = Reflect.set(target, key, newValue, receiver);
-          console.log("oldValue = ", oldValue, " newValue = ", newValue);
+              (Number(key) < target['length']) : hasOwnKey(target, key);
+          // 反射 - 修改新值
+          const result = Reflect.set(target, key, newValue, receiver);
+          // 根据 类型判断的操作 调用 触发器
           if (!hasKey) {
-              // 添加操作
-              // 通知effect trigger操作
+              // 添加操作 - 通知effect trigger操作
               trigger(target, TriggerOpsEnum.ADD, key, newValue);
           }
           else if (!compareValue(oldValue, newValue)) {
-              // 值不同,才去改。值一样,不修改
-              // 通知effect trigger操作
-              trigger(target, TriggerOpsEnum.SET, key, newValue, oldValue);
+              // 值不同,才去改 - 通知effect trigger操作
+              trigger(target, TriggerOpsEnum.SET, key, newValue);
           }
-          const result = Reflect.set(target, key, newValue, receiver);
           // 返回修改的结果 true/false
           return result;
       };
@@ -289,7 +275,7 @@ var VueReactivity = (function (exports) {
   const handleReadonly = {
       get: readonlyGetter,
       set: (target, key) => {
-          console.warn(target, " 所有属性都是只读, 无法修改");
+          console.warn(target, " 所有属性都是只读," + key + " 无法修改");
           return false;
       }
   };

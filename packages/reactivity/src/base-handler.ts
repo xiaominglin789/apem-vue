@@ -2,7 +2,6 @@ import { compareValue, hasOwnKey, isArray, isInteger, isObject } from "@vue/shar
 import { readonly, reactive } from "./reactive";
 import { TrackOpsEnum, TriggerOpsEnum } from "./enum";
 import { track, trigger } from "./effect";
-
 /**
  * getter读取
  * @param isReadonly 是否为仅读, true: readonly仅读, false: 响应式proxy
@@ -10,18 +9,15 @@ import { track, trigger } from "./effect";
  * @returns 
  */
 function createGetter(isReadonly=false, isShollaw=false) {
-  return function get(target: any, key: string, receiver: any) {
+  return function get(target: object, key: string, receiver?: any) {
+    // 从反射中取值
     const result = Reflect.get(target, key, receiver);
-
-    // console.log('get key = ', key);
 
     if (!isReadonly) {
       // 只读的对象不做依赖收集
       // 响应式对象-才作依赖收集
       // 取值时, 去 执行 tract 收集 effect
       // v3 effect =取代了=>  v2 watcher
-      // console.log("执行effect时会取值， 需要收集effect: ", key);
-
       track(target, TrackOpsEnum.GET, key);
     }
 
@@ -50,31 +46,25 @@ function createGetter(isReadonly=false, isShollaw=false) {
  * 2.如果是外部直接修改数组的length属性, 执行 trigger
  */
 function createSetter(isShollaw=false) {
-  return function set(target: any, key: string, newValue: any, receiver: any) {
+  return function set(target: object, key: string, newValue: any, receiver?: any) {
     const oldValue = target[key];
-
     // 是不是数组, 判断key(下标)是不是比原数组长度小:  小-> set 修改操作, 大 添加新元素的操作
     //   不是数值型数组, 则为 对象类型。判断 key是不是对象商的属性。是 -> 修改操作， 否 添加新属性的操作。
     let hasKey = (isArray(target) && isInteger(key)) ? 
-                  (Number(key) < target.length) : hasOwnKey(target, key);
+                  (Number(key) < target['length']) : hasOwnKey(target, key);
     
-    // 反射
-    // const result = Reflect.set(target, key, newValue, receiver);
-    
-    console.log("oldValue = ", oldValue, " newValue = ", newValue);
-    
+    // 反射 - 修改新值
+    const result = Reflect.set(target, key, newValue, receiver);                  
+
+    // 根据 类型判断的操作 调用 触发器
     if (!hasKey) {
-      // 添加操作
-      // 通知effect trigger操作
+      // 添加操作 - 通知effect trigger操作
       trigger(target, TriggerOpsEnum.ADD, key, newValue);
-      
     } else if (!compareValue(oldValue, newValue)) {
-      // 值不同,才去改。值一样,不修改
-      // 通知effect trigger操作
+      // 值不同,才去改 - 通知effect trigger操作
       trigger(target, TriggerOpsEnum.SET, key, newValue, oldValue);
     }
-
-    const result = Reflect.set(target, key, newValue, receiver);
+    
     // 返回修改的结果 true/false
     return result;
   }
@@ -110,8 +100,8 @@ const handleShollawReactive = {
 /** readonly包装-get/set处理 */
 const handleReadonly = {
   get: readonlyGetter,
-  set: (target: any, key: string) => {
-    console.warn(target, " 所有属性都是只读, 无法修改");
+  set: (target: object, key: string) => {
+    console.warn(target, " 所有属性都是只读," + key + " 无法修改");
     return false;
   }
 }
@@ -119,7 +109,7 @@ const handleReadonly = {
 /** shallowReadonly包装-get/set处理 */
 const handleShollawReadonly = {
   get: shollawReadonlyGetter,
-  set: (target: any, key: string) => {
+  set: (target: object, key: string) => {
     console.warn(target, " 的属性:", key, " 属性是只读的, 无法修改");
     return false;
   }

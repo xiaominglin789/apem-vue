@@ -19,20 +19,25 @@
       other: "abc",
       arr: [1,2,3]
     });
+    let state2 = reactive({
+      name: "state2"
+    });
 
     effect(() => {
-      app.innerHTML = state.arr[1] + state.arr.length;
-      console.log("123321123");
-      console.log(state.arr);
+      app.innerHTML = state.arr;
+    });
+    effect(() => {
+      app.innerHTML += "<p>" + state2.name + "</p>";
     });
 
     setTimeout(() => {
-      // state.arr.push(98);
-      // state.arr[2] = 9999;
-      state.arr.length = 1;
-      // console.log(state);
-    }, 3000);
-
+      // 越界创建新属性
+      state.arr[7] = 21;
+    }, 1000);
+    setTimeout(() => {
+      // 越界创建新属性
+      state2.name = "sad bear!";
+    }, 1200);
   </script>
 </body>
 </html>
