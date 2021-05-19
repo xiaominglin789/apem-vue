@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>test-toref</title>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="../../node_modules/@vue/reactivity/dist/reactivity.global.js"></script>
+  <script>
+    const { reactive, readonly, ref, toRef, toRefs } = VueReactivity;
+
+    const _num = ref("123");
+    console.log(_num);
+    app.innerHTML = _num.value;
+
+    const _obj = reactive({
+        name: "小店",
+        age: 1,
+        link: 10
+      })
+    console.log(_obj);
+    
+    const _name = toRef(_obj, "name");
+    console.log(_name.value);
+
+    const { name, age, link } = toRefs(_obj);
+    console.log(name.value, age.value, link.value);
+
+    const _only = reactive({
+      id: 1,
+      address: "xxxxx",
+      shop: {
+        name: "1号店"
+      }
+    })
+
+    const _id = toRef(_only, "id");
+    console.log(_id.value);
+
+    const { id, address, shop } = toRefs(_only);
+    console.log(id.value, address.value, shop.value);
+  </script>
+</body>
+</html>

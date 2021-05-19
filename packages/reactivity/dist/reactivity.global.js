@@ -337,11 +337,106 @@ var VueReactivity = (function (exports) {
       return createReactiveObject(data, true, handleShollawReadonly);
   }
 
+  /**
+   * ref用于基本类型的代理 [number string boolean null undefined]
+   * - 可以包装object类型，但是 对象类型包装最终使用的是 reactive 包装。
+   * - 类-RefImpl内部实现 会被转成es5的 Object.definedProperty() 代理实现
+   * @param value
+   */
+  function ref(value) {
+      return createRef(value);
+  }
+  /** 浅层ref包装 */
+  function shallowRef(value) {
+      return createRef(value, true);
+  }
+  /**
+   * 创建普通包装
+   * @param rawValue 原始值
+   * @param shallow 是否浅层包装
+   * @returns
+   */
+  function createRef(rawValue, shallow = false) {
+      return new RefImpl(rawValue, shallow);
+  }
+  /** 转换器 如果ref 传入的是对象，则 会变成 转出reactive-proxy对象 */
+  const convert = (val) => isObject(val) ? reactive(val) : val;
+  /**
+   * ref类代理
+   * es6-class类 => babel.js(转es5语法) => 内部使用 Object.defineProperty 代理
+   */
+  class RefImpl {
+      /**
+       * @param rawValue 原始
+       * @param shallow 是否是浅层包装
+       */
+      constructor(rawValue, shallow = false) {
+          this.__v_isRef = true;
+          this._rawValue = rawValue;
+          this._shallow = shallow;
+          this._value = shallow ? rawValue : convert(rawValue);
+      }
+      get value() {
+          // 收集依赖
+          track(this, TrackOpsEnum.GET, 'value');
+          return this._value;
+      }
+      set value(newValue) {
+          if (!compareValue(this._value, newValue)) {
+              this._rawValue = newValue;
+              this._value = this._shallow ? newValue : convert(newValue);
+              // 触发依赖更新
+              trigger(this, TriggerOpsEnum.SET, 'value', newValue, this._rawValue);
+          }
+      }
+  }
+  /** 将普通对象key对应的value 转出代理对象 */
+  class ObjectRefImpl {
+      constructor(_object, _key) {
+          this._object = _object;
+          this._key = _key;
+          this.__v_isRef = true;
+      }
+      get value() {
+          return this._object[this._key];
+      }
+      set value(val) {
+          this._object[this._key] = val;
+      }
+  }
+  /**
+   * 将对象的一个属性的值变成 对象
+   * - 保证代理对象属性解构出来使用,依然会收集和触发的依赖。
+   * @param target
+   * @param key
+   * @returns
+   */
+  function toRef(target, key) {
+      return new ObjectRefImpl(target, key);
+  }
+  /**
+   * 将对象的所有属性的值变成 对象
+   * - 保证代理对象属性解构出来使用,依然能收集和触发的依赖。
+   * @param target
+   * @returns
+   */
+  function toRefs(target) {
+      const ret = isArray(target) ? new Array[target["length"]] : {};
+      for (const key in target) {
+          ret[key] = toRef(target, key);
+      }
+      return ret;
+  }
+
   exports.effect = effect;
   exports.reactive = reactive;
   exports.readonly = readonly;
+  exports.ref = ref;
   exports.shallowReactive = shallowReactive;
   exports.shallowReadonly = shallowReadonly;
+  exports.shallowRef = shallowRef;
+  exports.toRef = toRef;
+  exports.toRefs = toRefs;
 
   Object.defineProperty(exports, '__esModule', { value: true });
 
